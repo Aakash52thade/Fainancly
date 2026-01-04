@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
-import {createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import {doc, getDoc, setDoc} from "firebase/firestore"; // ✅ Added imports
+import {createUserWithEmailAndPassword, GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import {doc, getDoc, setDoc} from "firebase/firestore";
 import {toast} from "react-toastify"
-import {auth, db} from '../firebase' // ✅ Added db import
+import {auth, db, provider} from '../firebase'
+import {useNavigate} from 'react-router-dom'
 
 const CustomInput = ({label, state, setState, placeholder, type = "text"}) => {
   return (
@@ -20,6 +21,7 @@ const CustomInput = ({label, state, setState, placeholder, type = "text"}) => {
 }
 
 const SignupSignin = () => {
+  const navigate = useNavigate();
   const [fields, setFields] = useState({
     name: '',
     email: '',
@@ -40,13 +42,13 @@ const SignupSignin = () => {
           console.log("User logged in:", user);
           toast.success("Logged in successfully!");
           setLoading(false);
-          // ✅ REMOVED createDoc(user) - not needed during login
           setFields({
             name: "",
             email: "",
             password: "",
             confirmPassword: ""
           })
+          navigate('/dashboard');
         })
         .catch((error) => {
           const errorMessage = error.message;
@@ -65,7 +67,6 @@ const SignupSignin = () => {
     
     if(fields.name !== "" && fields.email !== "" && fields.password !== "" && fields.confirmPassword !== ""){
       
-      // Check if passwords match
       if(fields.password !== fields.confirmPassword){
         toast.error("Passwords do not match!");
         setLoading(false);
@@ -77,9 +78,8 @@ const SignupSignin = () => {
           const user = userCredential.user;
           console.log("User created:", user);
           toast.success("User Created Successfully!");
-          setLoading(false);
           
-          createDoc(user); // ✅ Create doc only during signup
+          createDoc(user);
           
           setFields({
             name: "",
@@ -87,6 +87,8 @@ const SignupSignin = () => {
             password: "",
             confirmPassword: ""
           })
+          setLoading(false);
+          navigate('/dashboard');
         })
         .catch((error) => {
           const errorCode = error.code;
@@ -111,18 +113,39 @@ const SignupSignin = () => {
     if(!userData.exists()){
       try {
         await setDoc(doc(db, "users", user.uid),{
-          name: fields.name,
+          name: fields.name ? fields.name : user.displayName || "Anonymous",
           email: user.email,
           photoURL: user.photoURL ? user.photoURL : "",
-          createdAt: new Date(), // ✅ Fixed typo: cretedAt -> createdAt
+          createdAt: new Date(),
         })
         toast.success("Doc created!");
       } catch (error) {
         toast.error(error.message);
       }
-    } else {
-      toast.error("Doc already exists");
     }
+  };
+
+  const googleAuth = () => {
+    setLoading(true);
+    
+    signInWithPopup(auth, provider)
+      .then((result) => {
+        const user = result.user;
+        console.log("Google user:", user);
+        
+        createDoc(user);
+        
+        toast.success("User Authenticated with Google!");
+        setLoading(false);
+        navigate('/dashboard');
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        console.error("Google Auth Error:", errorCode, errorMessage);
+        toast.error("Google Auth failed: " + errorMessage);
+        setLoading(false);
+      });
   }
 
 
@@ -191,6 +214,7 @@ const SignupSignin = () => {
         </div>
 
         <button 
+          onClick={googleAuth}
           disabled={loading}
           className="w-full py-3 px-6 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
