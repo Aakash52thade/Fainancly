@@ -1,21 +1,26 @@
 import React, { useState } from 'react';
 import { Button, Form, Input, DatePicker, Select } from 'antd';
 
-const AddIncome = ({ onFinish }) => {
+const AddIncome = ({ onFinish, addTransaction }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
-  const onFinishForm = (values) => {
+  const onFinishForm = async (values) => {
     setLoading(true);
-    console.log('Income values:', values);
     
-    // Add your logic to save income to Firebase here
+    const newTransaction = {
+      type: 'income',
+      date: values.date.format('YYYY-MM-DD'),
+      amount: parseFloat(values.amount),
+      tag: values.tag,
+      name: values.name,
+    };
+
+    await addTransaction(newTransaction);
     
-    setTimeout(() => {
-      form.resetFields();
-      setLoading(false);
-      onFinish();
-    }, 1000);
+    form.resetFields();
+    setLoading(false);
+    onFinish();
   };
 
   return (
@@ -45,10 +50,6 @@ const AddIncome = ({ onFinish }) => {
           { 
             required: true, 
             message: 'Please input the amount!' 
-          },
-          {
-            pattern: /^[0-9]+$/,
-            message: 'Please enter a valid number!'
           }
         ]}
       >
